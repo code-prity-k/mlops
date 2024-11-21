@@ -19,7 +19,7 @@ TRAIN_CONFIG = {
 
 # Model configuration
 MODEL_CONFIG = {
-    "dropout_rate": 0.1,
+    "dropout_rate": 0.2,
     "fc_features": 10
 }
 

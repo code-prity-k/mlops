@@ -36,6 +36,13 @@ def train():
     train_dataset = datasets.MNIST(DATA_DIR, train=True, download=True, transform=transform)
     test_dataset = datasets.MNIST(DATA_DIR, train=False, download=True, transform=get_test_transforms())
     
+    # Show augmentation progress for first 100 images
+    print("\nApplying augmentation to first 100 images...")
+    aug_pbar = tqdm(range(100), desc='Augmenting', ncols=100)
+    for i in aug_pbar:
+        img, _ = train_dataset[i]
+        aug_pbar.set_description(f'Augmenting image {i+1}/100 - Shape: {img.shape}')
+    
     train_loader = torch.utils.data.DataLoader(
         train_dataset, 
         batch_size=TRAIN_CONFIG["batch_size"], 
@@ -48,7 +55,7 @@ def train():
     )
     
     # Print dataset sizes
-    print(f"Training samples: {len(train_dataset):,}")
+    print(f"\nTraining samples: {len(train_dataset):,}")
     print(f"Testing samples: {len(test_dataset):,}")
     
     criterion = nn.CrossEntropyLoss()
@@ -60,20 +67,16 @@ def train():
     correct = 0
     total = 0
     
-    # Disable progress bar in CI environment
-    disable_tqdm = bool(os.getenv('CI'))
+    # Configure progress bar
+    is_ci = bool(os.getenv('CI'))
+    total_batches = len(train_loader)
     
-    # # Layer-wise parameter count
-    # if not disable_tqdm:
-    #     print("\nLayer-wise parameters:")
-    #     for name, param in model.named_parameters():
-    #         if param.requires_grad:
-    #             print(f"{name}: {param.numel():,}")
+    pbar = tqdm(train_loader, 
+               desc='Training',
+               ncols=100,
+               leave=True)
     
-    for batch_idx, (data, target) in enumerate(tqdm(train_loader, 
-                                                   desc='Training', 
-                                                   disable=disable_tqdm, 
-                                                   ncols=100)):
+    for batch_idx, (data, target) in enumerate(pbar):
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
         output = model(data)
@@ -86,14 +89,19 @@ def train():
         total += target.size(0)
         correct += (predicted == target).sum().item()
         
+        # Update metrics
         running_loss = 0.9 * running_loss + 0.1 * loss.item()
+        train_acc = 100 * correct / total
         
-        # Print progress only every 100 batches in non-CI environment
-        if not disable_tqdm and batch_idx % 100 == 0:
-            train_acc = 100 * correct / total
-            print(f'Batch {batch_idx}/{len(train_loader)}, '
-                  f'Loss: {running_loss:.4f}, '
-                  f'Acc: {train_acc:.2f}%')
+        # Update progress bar and print batch info
+        pbar.set_description(f'Batch {batch_idx}/{total_batches}, Loss: {running_loss:.4f}, Acc: {train_acc:.2f}%')
+        
+        if is_ci and (batch_idx + 1) % (total_batches // 10) == 0:
+            print(f"Progress: {100*(batch_idx+1)/total_batches:.1f}%, "
+                  f"Loss: {running_loss:.4f}, "
+                  f"Acc: {train_acc:.2f}%")
+    
+    pbar.close()
     
     # Compute final metrics
     print("\nComputing final metrics...")

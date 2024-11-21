@@ -21,10 +21,14 @@ jobs:
         
     - name: Train model
       env:
-        CI: true  # Set CI environment variable
+        CI: true
       run: |
-        python src/train.py 2>&1 | grep -v "Downloading\|Extracting"
+        echo "=== Starting Model Training ==="
+        python src/train.py | grep -E "Parameters|Progress|Accuracy|Loss|Model saved"
+        echo "=== Training Complete ==="
         
     - name: Run tests
       run: |
-        pytest tests/ -v --no-header --no-summary
+        echo "=== Starting Tests ==="
+        pytest tests/ -v
+        echo "=== Testing Complete ==="
