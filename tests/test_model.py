@@ -13,12 +13,45 @@ from PIL import Image
 def test_model_parameters():
     model = MNISTModel()
     param_count = count_parameters(model)
-    assert param_count < 100000, f"Model has {param_count} parameters, should be less than 100000"
+    
+    # Print layer-wise parameters
+    print("\nLayer-wise Parameter Count:")
+    total_params = 0
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            params = param.numel()
+            total_params += params
+            print(f"{name}: {params:,} parameters")
+    
+    print(f"\nTotal Parameters: {total_params:,}")
+    print(f"Model Size: {total_params * 4 / 1024 / 1024:.2f} MB")
+    
+    # Calculate percentage of parameters in each layer type
+    conv_params = sum(p.numel() for name, p in model.named_parameters() 
+                     if 'conv' in name and p.requires_grad)
+    bn_params = sum(p.numel() for name, p in model.named_parameters() 
+                   if 'bn' in name and p.requires_grad)
+    fc_params = sum(p.numel() for name, p in model.named_parameters() 
+                   if 'fc' in name and p.requires_grad)
+    
+    print("\nParameter Distribution:")
+    print(f"Convolutional layers: {conv_params:,} ({100*conv_params/total_params:.1f}%)")
+    print(f"Batch Normalization: {bn_params:,} ({100*bn_params/total_params:.1f}%)")
+    print(f"Fully Connected layers: {fc_params:,} ({100*fc_params/total_params:.1f}%)")
+    
+    assert param_count < 100000, f"Model has {param_count:,} parameters, should be less than 100,000"
 
 def test_input_output_shape():
     model = MNISTModel()
     test_input = torch.randn(1, 1, 28, 28)
     output = model(test_input)
+    
+    # Print shape information
+    print("\nShape Analysis:")
+    print(f"Input shape: {test_input.shape}")
+    print(f"Output shape: {output.shape}")
+    print(f"Number of classes: {output.shape[1]}")
+    
     assert output.shape == (1, 10), f"Output shape is {output.shape}, should be (1, 10)"
 
 def test_model_accuracy():
@@ -30,8 +63,9 @@ def test_model_accuracy():
     if latest_model_path.exists():
         checkpoint = torch.load(latest_model_path, weights_only=True)
         model.load_state_dict(checkpoint['model_state_dict'])
+        print(f"\nLoaded model with {checkpoint.get('parameters', 'unknown')} parameters")
+        print(f"Previous test accuracy: {checkpoint.get('test_accuracy', 'unknown'):.2f}%")
     else:
-        # Fall back to finding the latest model by timestamp
         model_files = list(MODEL_DIR.glob('model_mnist_*.pth'))
         if not model_files:
             pytest.skip("No model file found")
@@ -56,7 +90,8 @@ def test_model_accuracy():
     )
     
     accuracy = compute_accuracy(model, test_loader, device)
-    assert accuracy > 80, f"Model accuracy is {accuracy}%, should be above 80%"
+    print(f"\nCurrent test accuracy: {accuracy:.2f}%")
+    assert accuracy > 80, f"Model accuracy is {accuracy:.2f}%, should be above 80%"
 
 def test_model_robustness():
     """Test model's robustness to input variations"""
@@ -73,48 +108,59 @@ def test_model_robustness():
     
     model.eval()
     
-    # Create a more realistic test input using MNIST mean and std
-    test_input = torch.randn(1, 1, 28, 28)
-    test_input = (test_input - test_input.mean()) / test_input.std()
-    test_input = test_input * DATASET_CONFIG["std"][0] + DATASET_CONFIG["mean"][0]
+    # Test with different scales
+    scales = [0.8, 0.9, 1.0, 1.1, 1.2]
+    print("\nScale Invariance Test:")
+    
+    base_input = torch.randn(1, 1, 28, 28)
+    base_input = (base_input - base_input.mean()) / base_input.std()
+    base_input = base_input * DATASET_CONFIG["std"][0] + DATASET_CONFIG["mean"][0]
     
     with torch.no_grad():
-        base_output = model(test_input)
-        # Test with slight scale variation
-        scaled_input = test_input * 0.95  # Reduced scale difference
-        scaled_output = model(scaled_input)
-        
-        # Compare softmax probabilities instead of hard predictions
+        base_output = model(base_input)
         base_probs = torch.nn.functional.softmax(base_output, dim=1)
-        scaled_probs = torch.nn.functional.softmax(scaled_output, dim=1)
+        _, base_pred = torch.max(base_output, 1)
         
-        # Check if probability distributions are similar
-        prob_diff = torch.abs(base_probs - scaled_probs).max().item()
+        print(f"Base prediction confidence: {base_probs.max().item():.2f}")
+        
+        for scale in scales:
+            scaled_input = base_input * scale
+            scaled_output = model(scaled_input)
+            scaled_probs = torch.nn.functional.softmax(scaled_output, dim=1)
+            _, scaled_pred = torch.max(scaled_output, 1)
+            
+            prob_diff = torch.abs(base_probs - scaled_probs).max().item()
+            print(f"Scale {scale:.1f} - Prediction diff: {prob_diff:.3f}")
+            
         assert prob_diff < 0.1, "Model predictions should be relatively scale invariant"
 
 def test_augmentation_consistency():
     """Test if augmentation preserves image structure"""
-    # Create a simple digit-like pattern as a numpy array
+    # Create a simple digit-like pattern
     image = np.zeros((28, 28), dtype=np.uint8)
-    image[10:20, 10:20] = 255  # Create a square pattern
+    image[10:20, 10:20] = 255
     
-    # Convert to PIL Image
     pil_image = Image.fromarray(image, mode='L')
-    
     transform = get_train_transforms()
-    augmented = transform(pil_image)
     
-    # Check if augmented image maintains basic properties
-    assert augmented.shape == (1, 28, 28), "Augmentation should preserve dimensions"
-    assert augmented.max() != augmented.min(), "Augmentation should preserve contrast"
-    assert not torch.allclose(augmented, torch.zeros_like(augmented)), "Augmentation should preserve pattern"
+    print("\nAugmentation Test:")
+    print("Testing 5 different augmentations...")
+    
+    for i in range(5):
+        augmented = transform(pil_image)
+        print(f"Augmentation {i+1}:")
+        print(f"- Shape: {augmented.shape}")
+        print(f"- Value range: [{augmented.min():.2f}, {augmented.max():.2f}]")
+        
+        assert augmented.shape == (1, 28, 28), "Augmentation should preserve dimensions"
+        assert augmented.max() != augmented.min(), "Augmentation should preserve contrast"
+        assert not torch.allclose(augmented, torch.zeros_like(augmented)), "Augmentation should preserve pattern"
 
 def test_model_confidence():
     """Test if model produces reasonable confidence scores"""
     device = torch.device('cpu')
     model = MNISTModel().to(device)
     
-    # Load latest model
     latest_model_path = MODEL_DIR / 'latest_model.pth'
     if latest_model_path.exists():
         checkpoint = torch.load(latest_model_path, weights_only=True)
@@ -122,15 +168,19 @@ def test_model_confidence():
     else:
         pytest.skip("No model file found")
     
-    # Test with random noise
-    noise = torch.randn(1, 1, 28, 28)
-    with torch.no_grad():
-        output = model(noise)
-        probabilities = torch.nn.functional.softmax(output, dim=1)
-        max_prob = probabilities.max().item()
-        
-    # Model should not be too confident on random noise
-    assert max_prob < 0.9, f"Model is too confident on random noise: {max_prob:.2f}"
+    print("\nConfidence Test:")
+    
+    # Test with different noise levels
+    noise_levels = [0.1, 0.5, 1.0, 2.0]
+    for noise_level in noise_levels:
+        noise = torch.randn(1, 1, 28, 28) * noise_level
+        with torch.no_grad():
+            output = model(noise)
+            probabilities = torch.nn.functional.softmax(output, dim=1)
+            max_prob = probabilities.max().item()
+            print(f"Noise level {noise_level:.1f} - Max confidence: {max_prob:.2f}")
+            
+        assert max_prob < 0.9, f"Model is too confident on noise (level {noise_level}): {max_prob:.2f}"
 
 if __name__ == '__main__':
     pytest.main([__file__]) 
