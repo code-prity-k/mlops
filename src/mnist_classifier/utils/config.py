@@ -19,8 +19,11 @@ TRAIN_CONFIG = {
 
 # Model configuration
 MODEL_CONFIG = {
-    "dropout_rate": 0.2,
-    "fc_features": 10
+    "dropout_rate": 0.1,
+    "fc_features": 10,
+    "conv_channels": [8, 16, 32],
+    "batch_norm": True,
+    "scale_tolerance": 0.3
 }
 
 # Dataset configuration

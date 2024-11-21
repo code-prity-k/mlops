@@ -24,7 +24,7 @@ jobs:
         CI: true
       run: |
         echo "=== Starting Model Training ==="
-        python src/train.py | grep -E "Parameters|Progress|Accuracy|Loss|Model saved"
+        python src/train.py 2>&1 | grep -E "Parameters|Accuracy|Loss|Model saved" | grep -v "Batch"
         echo "=== Training Complete ==="
         
     - name: Run tests
