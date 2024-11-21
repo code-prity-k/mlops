@@ -1,6 +1,6 @@
 # MNIST Classification with CI/CD Pipeline
 
-[![ML Pipeline](https://github.com/<your-username>/<repo-name>/actions/workflows/ml_pipeline.yml/badge.svg)](https://github.com/<your-username>/<repo-name>/actions/workflows/ml_pipeline.yml)
+[![ML Pipeline](https://github.com/code-prity-k/mlops/actions/workflows/ml_pipeline.yml/badge.svg)](https://github.com/code-prity-k/mlops/actions/workflows/ml_pipeline.yml)
 
 A lightweight CNN implementation for MNIST digit classification with automated testing and CI/CD pipeline using GitHub Actions. The model achieves >80% accuracy with less than 50K parameters in just one epoch of training.
 
