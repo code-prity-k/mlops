@@ -39,7 +39,7 @@ def test_model_parameters():
     print(f"Batch Normalization: {bn_params:,} ({100*bn_params/total_params:.1f}%)")
     print(f"Fully Connected layers: {fc_params:,} ({100*fc_params/total_params:.1f}%)")
     
-    assert param_count < 100000, f"Model has {param_count:,} parameters, should be less than 100,000"
+    assert param_count < 25000, f"Model has {param_count:,} parameters, should be less than 100,000"
 
 def test_input_output_shape():
     model = MNISTModel()

@@ -19,12 +19,18 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         
+    - name: Create directories
+      run: |
+        mkdir -p data
+        mkdir -p models
+        mkdir -p visualizations
+        
     - name: Train model
       env:
         CI: true
       run: |
         echo "=== Starting Model Training ==="
-        python src/train.py 2>&1 | grep -E "Parameters|Accuracy|Loss|Model saved|Starting|Complete" 
+        python src/train.py 2>&1 | tee training.log || (cat training.log && exit 1)
         echo "=== Training Complete ==="
         
     - name: Run tests
@@ -32,3 +38,12 @@ jobs:
         echo "=== Starting Tests ==="
         pytest tests/ -v
         echo "=== Testing Complete ==="
+        
+    - name: Upload artifacts
+      if: always()
+      uses: actions/upload-artifact@v2
+      with:
+        name: training-artifacts
+        path: |
+          models/
+          training.log
